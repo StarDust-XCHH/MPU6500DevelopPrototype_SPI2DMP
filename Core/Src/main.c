@@ -24,7 +24,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <MPU6500.h>
+#include <math.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -56,6 +57,19 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+const double q30 = 1073741824.0f, k = 180.0 / 3.1415926535897932384626433832795;
+double q0, q1, q2, q3;
+float fpitch, froll, fyaw;
+uint32_t sensor_timestamp;
+int16_t gyro[3], acce[3], sensors;
+unsigned char more;
+int32_t quat[4];
+
+int _write(int file, char *ptr, int len) {
+  (void)file;
+  HAL_UART_Transmit(&huart2, (uint8_t *)ptr, len, 10);
+  return len;
+}
 
 /* USER CODE END 0 */
 
@@ -91,6 +105,7 @@ int main(void)
   MX_USART2_UART_Init();
   MX_SPI2_Init();
   /* USER CODE BEGIN 2 */
+  while(MPU6500Init() != HAL_OK){};
 
   /* USER CODE END 2 */
 
@@ -98,6 +113,19 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+
+    dmp_read_fifo(gyro, acce, (long *)quat, (unsigned long *)&sensor_timestamp, &sensors, &more);
+    if(sensors & (INV_WXYZ_QUAT)){
+      q0 = quat[0] / q30;
+      q1 = quat[1] / q30;
+      q2 = quat[2] / q30;
+      q3 = quat[3] / q30;
+      fpitch = asin(-2 * q1 * q3 + 2 * q0 * q2)* k;
+      froll  = atan2(2 * q2 * q3 + 2 * q0 * q1, -2 * q1 * q1 - 2 * q2 * q2 + 1)* k;
+      fyaw   = atan2(2 * (q1 * q2 + q0 * q3), q0 * q0 + q1 * q1 - q2 * q2 - q3 * q3) * k;
+      printf("%.2f,%.2f,%.2f\n", froll, fpitch, fyaw);
+    }
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
